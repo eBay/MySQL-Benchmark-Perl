@@ -5,7 +5,9 @@ use strict;
 use warnings FATAL => 'all';
 
 use Getopt::Long;
+use MySQL::Benchmark::Worker;
 use MySQL::Benchmark::Query;
+Time::HiRes;
 use YAML::XS qw();
 
 =head1 NAME
@@ -117,6 +119,125 @@ sub fork_workers {
             );
     }
 }
+
+=head2 tear_down_workers
+
+=cut
+
+sub tear_down_workers {
+    my ($self) = @_;
+    my $stopped_count;
+    foreach my $worker ( @{ $$self{workers_pid} } ) {
+        my $count = kill 'TERM', $worker;
+        $stopped_count += $count;
+    }
+}
+
+=head2 stop_benchmark
+
+=cut 
+
+sub stop_benchmark {
+    my ($self) = @_;
+    return if $self->is_stopped;
+    $$self{STOP} = 1;
+    $self->tear_down_workers;
+}
+
+=head2 is_stopped
+
+=cut
+
+sub is_stopped { ${ $_[0] }{STOP} }
+
+=head2 handle_sigchild
+
+=cut
+
+sub handle_sigchild {
+    my ($self) = @_;
+    while ( ( my $kid = waitpid( -1, WNOHANG ) ) > 0 ) {
+        @{ $$self{worker_pids} }
+            = grep { $_ != $kid } @{ $$self{worker_pids} };
+    }
+}
+
+=head2 handle_sigterm
+
+=cut
+
+sub handle_sigterm {
+    my ($self) = @_;
+    $self->stop_benchmark;
+}
+
+=head2 initialise_signal_handers
+
+=cut
+
+sub initialise_signal_handlers {
+    my ($self) = @_;
+    $SIG{CHLD} = sub { $self->handle_sigchild };
+    $SIG{TERM} = $SIG{INT} = sub { $self->handle_sigterm };
+}
+
+=head2 is_time_to_stop
+
+=cut
+
+sub is_time_to_stop {
+    my ($self) = @_;
+
+    return $self->is_stopped
+        ? 1
+        : ( Time::HiRes::tv_inteval( $$self{start_time} )
+            - $$self{options}{runtime} > 0 );
+}
+
+=head2 receive_message
+
+=cut
+
+sub receive_message { }
+
+=head2 process_message
+
+=cut 
+
+sub process_message { }
+
+=head2 supervision_loop
+
+=cut
+
+sub supervision_loop {
+    my ($self) = @_;
+    my $$self{start_time} = [Time::HiRes::gettimeofday];
+
+SUPERVISION_LOOP:
+    while ( scalar @{ $$self{worker_pids} } > 0 ) {
+
+        my $message = $self->receive_message;
+        $self->process_message($message);
+
+    }
+    continue {
+        $self->stop_benchmark if $self->is_time_to_stop;
+    }
+
+}
+
+=head2 tear_down_zeromq
+
+=cut
+
+sub tear_down_zeromq { }
+
+=head2 output_results
+
+=cut
+
+sub output_results { print STDERR "Complete!" }
 
 =head1 AUTHOR
 

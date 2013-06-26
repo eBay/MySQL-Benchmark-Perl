@@ -1,5 +1,3 @@
-use MySQL::Benchmark::Query;
-
 package MySQL::Benchmark::Query;
 use 5.006;
 use strict;

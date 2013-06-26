@@ -1,3 +1,4 @@
+*.sq[op]
 Makefile
 Makefile.old
 Build

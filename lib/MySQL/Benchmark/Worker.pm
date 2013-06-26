@@ -181,7 +181,7 @@ BENCHMARK_LOOP:
                 += Time::HiRes::tv_interval( $time_start, $time_end );
             foreach my $key ( keys %$ini_stat ) {
                 $$self{partial}{ $query->id }{session}{$key}
-                    += $$end_status{$key} - $$ini_status{$key};
+                    += $$end_stat{$key} - $$ini_stat{$key};
             }
 
         }

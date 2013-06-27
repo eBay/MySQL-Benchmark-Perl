@@ -227,6 +227,20 @@ sub new {
     }
 }
 
+=head2 run
+
+=cut
+
+sub run {
+    my ( $self, $dbh ) = @_;
+    my $result = eval {
+        $dbh->selectall_arrayref( $self->sql, { Slice => {} },
+            $self->parameters );
+    };
+    die if $@;
+    return $result;
+}
+
 =head2 id
 
 Accessor. Returns the ID for this query.

@@ -1,0 +1,7 @@
+#!/usr/bin/perl
+use warnings;
+use strict;
+use FindBin;
+use lib qq{$FindBin::Bin/../lib/};
+use MySQL::Benchmark;
+MySQL::Benchmark->new();

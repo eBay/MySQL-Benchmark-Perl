@@ -156,6 +156,27 @@ sub flush_partial {
     delete $$self{partial};
 }
 
+=head2 session_status
+
+=cut 
+
+sub session_status {
+    my ($self) = @_;
+    my $result;
+    eval {
+        my $sth = $$self{dbh}->prepare('SHOW SESSION STATUS');
+        $sth->execute;
+        $result
+            = { map { lc $$_[0] => $$_[1] } @{ $sth->fetchall_arrayref } };
+        $sth->finish;
+    };
+    if ( !$$self{STOP} && $@ ) {
+        $self->log( 'DBI Error: "' . $@ . '".' );
+        die;
+    }
+    return $result;
+}
+
 =head2 benchmark_loop
 
 =cut
@@ -179,7 +200,7 @@ BENCHMARK_LOOP:
             $$self{partial}{ $query->id }{runs}++;
             $$self{partial}{ $query->id }{run_time}
                 += Time::HiRes::tv_interval( $time_start, $time_end );
-            foreach my $key ( keys %$ini_stat ) {
+            foreach my $key ( @{ $ini_stat }{ qw( bytes_sent bytes_received ) } ) {
                 $$self{partial}{ $query->id }{session}{$key}
                     += $$end_stat{$key} - $$ini_stat{$key};
             }

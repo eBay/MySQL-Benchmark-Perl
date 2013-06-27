@@ -7,7 +7,8 @@ use warnings FATAL => 'all';
 use Getopt::Long;
 use MySQL::Benchmark::Worker;
 use MySQL::Benchmark::Query;
-Time::HiRes;
+use Time::HiRes;
+use POSIX qw(:sys_wait_h );
 use YAML::XS qw();
 
 =head1 NAME
@@ -114,7 +115,7 @@ sub fork_workers {
         push @{ $$self{worker_pids} },
             MySQL::Benchmark::Worker->new(
             mysql          => $$self{options}{mysql},
-            queries        => $$self{options}{queries},
+            queries        => $$self{queries},
             flush_interval => $$self{options}{flush_interval},
             );
     }
@@ -190,7 +191,7 @@ sub is_time_to_stop {
 
     return $self->is_stopped
         ? 1
-        : ( Time::HiRes::tv_inteval( $$self{start_time} )
+        : ( Time::HiRes::tv_interval( $$self{start_time} )
             - $$self{options}{runtime} > 0 );
 }
 
@@ -212,7 +213,7 @@ sub process_message { }
 
 sub supervision_loop {
     my ($self) = @_;
-    my $$self{start_time} = [Time::HiRes::gettimeofday];
+    $$self{start_time} = [Time::HiRes::gettimeofday];
 
 SUPERVISION_LOOP:
     while ( scalar @{ $$self{worker_pids} } > 0 ) {

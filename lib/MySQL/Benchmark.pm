@@ -112,6 +112,7 @@ sub initialize_zeromq { }
 sub fork_workers {
     my ($self) = @_;
     my $workers;
+    $$self{worker_pids} = [];
     while ( ++$workers <= $$self{options}{workers} ) {
         push @{ $$self{worker_pids} },
             MySQL::Benchmark::Worker->new(
@@ -120,6 +121,7 @@ sub fork_workers {
             flush_interval => $$self{options}{flush_interval},
             );
     }
+    $self->log( "Forked workers: @{ $$self{worker_pids} }." );
 }
 
 =head2 tear_down_workers
@@ -131,14 +133,14 @@ sub tear_down_workers {
     my $stopped_count;
     {
         local $" = ', ';
-        $self->log("About to signal workers: @{ $$self{worker_pids} }.");
+        $self->log("Signalling workers: @{ $$self{worker_pids} }.");
     }
     foreach my $worker ( @{ $$self{worker_pids} } ) {
         if ( my $count = kill 'TERM', $worker ) {
-            $self->log("Successfuly signaled Worker[$worker].");
             $stopped_count += $count;
         }
     }
+    $self->log( "Signalled $stopped_count workers." );
 }
 
 =head2 stop_benchmark

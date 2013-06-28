@@ -57,13 +57,9 @@ sub new {
     my $self = bless \%self, $class;
 
     # TODO: sanity-check parameters passed in to this Worker.
-    $self->log('Instance created.');
     $self->initialise_zeromq;
-    $self->log('ZMQ Initialised (not).');
     $self->initialise_signal_handlers;
-    $self->log('Signal handlers installed');
     $self->initialise_database_connection;
-    $self->log('Database connection established');
     $self->benchmark_loop;
     $self->tear_down_database_conncetion;
     $self->tear_down_zeromq;
@@ -97,7 +93,6 @@ sub initialise_zeromq { }
 
 sub handle_sigterm {
     my ($self) = @_;
-    $self->log('Requested to stop the benchmark!');
     $self->stop;
 }
 
@@ -207,7 +202,6 @@ sub flush_partial {
 
     # Remove partial stats
     delete $$self{partial};
-    $self->log('Flushed partial statistics to controller.');
 }
 
 =head2 session_status
@@ -242,8 +236,6 @@ RUN_QUERY: {
 sub benchmark_loop {
     my ($self) = @_;
     my $last_flush = [Time::HiRes::gettimeofday];
-
-    $self->log('Entering benchmark loop');
 
 BENCHMARK_LOOP:
     while ( !$self->is_stopped ) {

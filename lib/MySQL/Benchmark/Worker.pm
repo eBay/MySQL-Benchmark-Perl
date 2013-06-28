@@ -297,6 +297,10 @@ sub tear_down_database_conncetion {
 
 =head2 tear_down_ipc
 
+Method call to tear down IPC communication client. Theoretically, if I don't do
+anything here when the IPC client socket object goes out of context it will be
+properly flushed and closed.
+
 =cut
 
 sub tear_down_ipc { }

@@ -5,12 +5,15 @@ use strict;
 use warnings FATAL => 'all';
 
 use Getopt::Long;
+use MySQL::Benchmark::IPC::Server;
 use MySQL::Benchmark::Worker;
 use MySQL::Benchmark::Query;
 use MySQL::Benchmark::Logger qw(log);
 use Time::HiRes;
 use POSIX qw(:sys_wait_h );
-use YAML::XS qw();
+use YAML::XS ();
+use Storable ();
+use Data::Dumper();
 
 =head1 NAME
 
@@ -44,11 +47,11 @@ sub new {
 
     $self->evaluate_command_line_options;
     $self->load_queries_file;
-    $self->initialize_zeromq;
+    $self->initialize_ipc;
     $self->fork_workers;
     $self->initialise_signal_handlers;
     $self->supervision_loop;
-    $self->tear_down_zeromq;
+    $self->tear_down_ipc;
     $self->output_results;
 }
 
@@ -99,11 +102,28 @@ sub load_queries_file {
             @{ YAML::XS::LoadFile( $$self{options}{queries} ) } ];
 }
 
-=head2 initialise_zeromq
+=head2 initialise_ipc
 
 =cut 
 
-sub initialize_zeromq { }
+sub initialize_ipc {
+    my ($self) = @_;
+    my $server = eval { MySQL::Benchmark::IPC::Server->new };
+    die qq{Cannot initalise IPC communications: $@} if $@;
+    $$self{ipc_server} = $server;
+}
+
+=head2 ipc_server_socket
+
+Accessor. Returns the socket currently in use by the underlying
+MySQL::Benchmark::IPC::Server.
+
+=cut
+
+sub ipc_server_socket {
+    my ($self) = @_;
+    return $$self{ipc_server}->socket_file;
+}
 
 =head2 fork_workers
 
@@ -119,9 +139,10 @@ sub fork_workers {
             mysql          => $$self{options}{mysql},
             queries        => $$self{queries},
             flush_interval => $$self{options}{flush_interval},
+            socket_file    => $self->ipc_server_socket,
             );
     }
-    $self->log( "Forked workers: @{ $$self{worker_pids} }." );
+    $self->log("Forked workers: @{ $$self{worker_pids} }.");
 }
 
 =head2 tear_down_workers
@@ -140,7 +161,7 @@ sub tear_down_workers {
             $stopped_count += $count;
         }
     }
-    $self->log( "Signalled $stopped_count workers." );
+    $self->log("Signalled $stopped_count workers.");
 }
 
 =head2 stop_benchmark
@@ -213,13 +234,27 @@ sub is_time_to_stop {
 
 =cut
 
-sub receive_message { sleep 1 }
+sub receive_message {
+    my ($self) = @_;
+    my $message = $$self{ipc_server}->receive;
+    return $message;
+}
 
 =head2 process_message
 
 =cut 
 
-sub process_message { sleep 1 }
+sub process_message {
+    my ( $self, $frozen_message ) = @_;
+    return unless defined $frozen_message;
+    my $message = eval { Storable::thaw($frozen_message) };
+    return if $@;    # cannot read, cannot account for.
+
+    # FIXME: try doing something a little more useful than this with the data.
+    $Data::Dumper::Terse  = 1;
+    $Data::Dumper::Indent = 0;
+    print Data::Dumper::Dumper($message), $/;
+}
 
 =head2 supervision_loop
 
@@ -244,11 +279,11 @@ SUPERVISION_LOOP:
 
 }
 
-=head2 tear_down_zeromq
+=head2 tear_down_ipc
 
 =cut
 
-sub tear_down_zeromq { }
+sub tear_down_ipc { }
 
 =head2 output_results
 

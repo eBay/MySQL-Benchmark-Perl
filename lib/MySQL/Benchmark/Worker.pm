@@ -7,9 +7,11 @@ use warnings FATAL => 'all';
 use Time::HiRes;
 use DBI;
 use Storable;
+use MySQL::Benchmark::IPC::Client;
 use MySQL::Benchmark::Query;
 use MySQL::Benchmark::Logger qw( log );
 use POSIX qw(:errno_h);
+use Storable ();
 
 use constant { DBOPTIONS =>
         { RaiseError => 1, PrintError => 0, AutoCommit => 0, PrintWarn => 0 },
@@ -57,12 +59,12 @@ sub new {
     my $self = bless \%self, $class;
 
     # TODO: sanity-check parameters passed in to this Worker.
-    $self->initialise_zeromq;
+    $self->initialise_ipc;
     $self->initialise_signal_handlers;
     $self->initialise_database_connection;
     $self->benchmark_loop;
     $self->tear_down_database_conncetion;
-    $self->tear_down_zeromq;
+    $self->tear_down_ipc;
     exit;
 }
 
@@ -81,11 +83,19 @@ sub stop {
 
 sub is_stopped { ${ $_[0] }{__STOP} }
 
-=head2 initialise_zeromq
+=head2 initialise_ipc
 
 =cut
 
-sub initialise_zeromq { }
+sub initialise_ipc {
+    my ($self) = @_;
+    my $client = eval {
+        MySQL::Benchmark::IPC::Client->new(
+            socket_file => $$self{socket_file} );
+    };
+    die if $@;
+    $$self{ipc_client} = $client;
+}
 
 =head2 handle_sigterm
 
@@ -197,8 +207,11 @@ sub flush_partial {
         }
     );
 
-    # Send ZMQ Message
-    # TODO: implement this.
+    # Send IPC Message
+    while ( !defined( $$self{ipc_client}->send($message) ) ) {
+        $self->log('Message sending operation failed. Retrying.');
+        sleep 1;
+    }
 
     # Remove partial stats
     delete $$self{partial};
@@ -282,11 +295,11 @@ sub tear_down_database_conncetion {
     delete $$self{dbh};
 }
 
-=head2 tear_down_zeromq
+=head2 tear_down_ipc
 
 =cut
 
-sub tear_down_zeromq { }
+sub tear_down_ipc { }
 
 =head1 AUTHOR
 

@@ -8,6 +8,8 @@ use Time::HiRes;
 use DBI;
 use Storable;
 use MySQL::Benchmark::Query;
+use MySQL::Benchmark::Logger qw( log );
+use POSIX qw(:errno_h);
 
 use constant { DBOPTIONS =>
         { RaiseError => 1, PrintError => 0, AutoCommit => 0, PrintWarn => 0 },
@@ -55,9 +57,13 @@ sub new {
     my $self = bless \%self, $class;
 
     # TODO: sanity-check parameters passed in to this Worker.
+    $self->log('Instance created.');
     $self->initialise_zeromq;
+    $self->log('ZMQ Initialised (not).');
     $self->initialise_signal_handlers;
+    $self->log('Signal handlers installed');
     $self->initialise_database_connection;
+    $self->log('Database connection established');
     $self->benchmark_loop;
     $self->tear_down_database_conncetion;
     $self->tear_down_zeromq;
@@ -91,7 +97,8 @@ sub initialise_zeromq { }
 
 sub handle_sigterm {
     my ($self) = @_;
-    $self->stop_benchmark;
+    $self->log('Requested to stop the benchmark!');
+    $self->stop;
 }
 
 =head2 initialise_signal_handlers
@@ -128,12 +135,58 @@ sub __dsn {
 
 sub initialise_database_connection {
     my ($self) = @_;
+
     $$self{dbh} = DBI->connect(
         $self->__dsn,
         $$self{mysql}{user},
         $$self{mysql}{password}, DBOPTIONS
     );
     die DBI::errstr unless $$self{dbh};
+}
+
+=head2 dbh
+
+Accessor to DBI object with basic conncetivity check
+
+FIXME: DBI behaves weird with interrupted system calls. It complains "MySQL
+Server went away", stop answering to C<ping()> calls, but the DBI object is
+still present and will complain about being garbage collected without first
+having it's C<disconnect()> method called.
+
+=cut
+
+sub dbh {
+    my ($self) = @_;
+    unless ( UNIVERSAL::can( $$self{dbh}, 'ping' ) && $$self{dbh}->ping ) {
+        if ( UNIVERSAL::can( $$self{dbh}, 'disconnect' ) ) {
+            $$self{dbh}->disconnect;
+        }
+        $self->initialise_database_connection;
+    }
+    return $$self{dbh};
+}
+
+=head2 run_benchmark_query
+
+=cut
+
+sub run_benchmark_query {
+    my ( $self, $query ) = @_;
+    my $result;
+RUN_QUERY: {
+        eval {
+            $result
+                = $self->dbh->selectall_arrayref( $query->sql,
+                { Slice => {} },
+                $query->parameters );
+        };
+        if ( defined($@) && defined($!) && $! == EINTR ) {
+            $@ = $! = undef;
+            redo RUN_QUERY;
+        }
+    }
+    die if $@;
+    return $result;
 }
 
 =head2 flush_partial
@@ -154,6 +207,7 @@ sub flush_partial {
 
     # Remove partial stats
     delete $$self{partial};
+    $self->log('Flushed partial statistics to controller.');
 }
 
 =head2 session_status
@@ -163,17 +217,21 @@ sub flush_partial {
 sub session_status {
     my ($self) = @_;
     my $result;
-    eval {
-        my $sth = $$self{dbh}->prepare('SHOW SESSION STATUS');
-        $sth->execute;
-        $result
-            = { map { lc $$_[0] => $$_[1] } @{ $sth->fetchall_arrayref } };
-        $sth->finish;
-    };
-    if ( !$$self{STOP} && $@ ) {
-        $self->log( 'DBI Error: "' . $@ . '".' );
-        die;
+RUN_QUERY: {
+        eval {
+            my $sth = $self->dbh->prepare('SHOW SESSION STATUS');
+            $sth->execute;
+            $result
+                = { map { lc $$_[0] => $$_[1] }
+                    @{ $sth->fetchall_arrayref } };
+            $sth->finish;
+        };
+        if ( defined($@) && defined($!) && $! == EINTR ) {
+            $@ = $! = undef;
+            redo RUN_QUERY;
+        }
     }
+    die if $@;
     return $result;
 }
 
@@ -185,6 +243,8 @@ sub benchmark_loop {
     my ($self) = @_;
     my $last_flush = [Time::HiRes::gettimeofday];
 
+    $self->log('Entering benchmark loop');
+
 BENCHMARK_LOOP:
     while ( !$self->is_stopped ) {
         foreach my $query ( @{ $$self{queries} } ) {
@@ -193,16 +253,18 @@ BENCHMARK_LOOP:
 
             my $ini_stat   = $self->session_status;
             my $time_start = [Time::HiRes::gettimeofday];
-            my $resultset  = $query->run( $$self{dbh} );
+            my $resultset  = $self->run_benchmark_query($query);
             my $time_end   = [Time::HiRes::gettimeofday];
             my $end_stat   = $self->session_status;
 
             $$self{partial}{ $query->id }{runs}++;
             $$self{partial}{ $query->id }{run_time}
                 += Time::HiRes::tv_interval( $time_start, $time_end );
-            foreach my $key ( @{ $ini_stat }{ qw( bytes_sent bytes_received ) } ) {
-                $$self{partial}{ $query->id }{session}{$key}
-                    += $$end_stat{$key} - $$ini_stat{$key};
+            if ( defined($ini_stat) && defined($end_stat) ) {
+                foreach my $key (qw( bytes_sent bytes_received )) {
+                    $$self{partial}{ $query->id }{session}{$key}
+                        += $$end_stat{$key} - $$ini_stat{$key};
+                }
             }
 
         }
@@ -224,7 +286,7 @@ BENCHMARK_LOOP:
 
 sub tear_down_database_conncetion {
     my ($self) = @_;
-    $$self{dbh}->disconnect if ref $$self{dbh};
+    $self->dbh->disconnect if UNIVERSAL::can( $$self{dbh}, 'disconnect' );
     delete $$self{dbh};
 }
 

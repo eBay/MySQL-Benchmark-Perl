@@ -7,6 +7,7 @@ use warnings FATAL => 'all';
 use Getopt::Long;
 use MySQL::Benchmark::Worker;
 use MySQL::Benchmark::Query;
+use MySQL::Benchmark::Logger qw(log);
 use Time::HiRes;
 use POSIX qw(:sys_wait_h );
 use YAML::XS qw();
@@ -62,9 +63,9 @@ sub evaluate_command_line_options {
     # FIXME: define workers in function of available processor cores?
     my $options = {
         workers        => 1,
-        runtime        => 60,
+        runtime        => 10,
         mysql          => { defaults_file => "$ENV{HOME}/.my.cnf" },
-        flush_interval => 60,
+        flush_interval => 3,
     };
 
     my $result = GetOptions(
@@ -128,9 +129,15 @@ sub fork_workers {
 sub tear_down_workers {
     my ($self) = @_;
     my $stopped_count;
-    foreach my $worker ( @{ $$self{workers_pid} } ) {
-        my $count = kill 'TERM', $worker;
-        $stopped_count += $count;
+    {
+        local $" = ', ';
+        $self->log("About to signal workers: @{ $$self{worker_pids} }.");
+    }
+    foreach my $worker ( @{ $$self{worker_pids} } ) {
+        if ( my $count = kill 'TERM', $worker ) {
+            $self->log("Successfuly signaled Worker[$worker].");
+            $stopped_count += $count;
+        }
     }
 }
 
@@ -141,6 +148,7 @@ sub tear_down_workers {
 sub stop_benchmark {
     my ($self) = @_;
     return if $self->is_stopped;
+    $self->log('Stopping benchmark');
     $$self{STOP} = 1;
     $self->tear_down_workers;
 }
@@ -169,6 +177,7 @@ sub handle_sigchild {
 
 sub handle_sigterm {
     my ($self) = @_;
+    $self->log('    Interrupted by user. Stopping benchmark.');
     $self->stop_benchmark;
 }
 
@@ -189,23 +198,26 @@ sub initialise_signal_handlers {
 sub is_time_to_stop {
     my ($self) = @_;
 
-    return $self->is_stopped
-        ? 1
-        : ( Time::HiRes::tv_interval( $$self{start_time} )
-            - $$self{options}{runtime} > 0 );
+    if ( $self->is_stopped ) {
+        return 1;
+    }
+    else {
+        return Time::HiRes::tv_interval( $$self{start_time} )
+            - $$self{options}{runtime} > 0;
+    }
 }
 
 =head2 receive_message
 
 =cut
 
-sub receive_message { }
+sub receive_message { sleep 1 }
 
 =head2 process_message
 
 =cut 
 
-sub process_message { }
+sub process_message { sleep 1 }
 
 =head2 supervision_loop
 
@@ -223,7 +235,9 @@ SUPERVISION_LOOP:
 
     }
     continue {
-        $self->stop_benchmark if $self->is_time_to_stop;
+        if ( $self->is_time_to_stop && !$self->is_stopped ) {
+            $self->stop_benchmark;
+        }
     }
 
 }
@@ -238,7 +252,7 @@ sub tear_down_zeromq { }
 
 =cut
 
-sub output_results { print STDERR "Complete!" }
+sub output_results { print "\n\nComplete!\n\n" }
 
 =head1 AUTHOR
 

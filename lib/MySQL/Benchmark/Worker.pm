@@ -165,6 +165,7 @@ sub dbh {
     unless ( UNIVERSAL::can( $$self{dbh}, 'ping' ) && $$self{dbh}->ping ) {
         if ( UNIVERSAL::can( $$self{dbh}, 'disconnect' ) ) {
             $$self{dbh}->disconnect;
+            sleep 1;
         }
         $self->initialise_database_connection;
     }

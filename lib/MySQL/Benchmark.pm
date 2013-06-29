@@ -236,7 +236,10 @@ sub is_time_to_stop {
 
 sub receive_message {
     my ($self) = @_;
-    my $message = $$self{ipc_server}->receive;
+    my $frozen = $$self{ipc_server}->receive;
+
+    # Ignore malformed messages without further ado.
+    my $message = eval { Storable::thaw($frozen) };
     return $message;
 }
 
@@ -245,10 +248,27 @@ sub receive_message {
 =cut 
 
 sub process_message {
-    my ( $self, $frozen_message ) = @_;
-    return unless defined $frozen_message;
-    my $message = eval { Storable::thaw($frozen_message) };
-    return if $@;    # cannot read, cannot account for.
+    my ( $self, $message ) = @_;
+    return
+        unless UNIVERSAL::isa( $message, 'HASH' )
+        && UNIVERSAL::isa( $$message{statistics}, 'HASH' );
+
+    # The idea here is to maintain global totals and per-minute partials.
+    foreach my $query ( keys %{ $$message{statistics} } ) {
+        $$self{global_stats}{$query}{runs}
+            += $$message{statistics}{$query}{runs};
+        $$self{global_stats}{$query}{runtime}
+            += $$message{statistics}{$query}{run_time};
+        $$self{global_stats}{$query}{bytes_sent}
+            += $$message{statistics}{$query}{session}{bytes_sent};
+        $$self{global_stats}{$query}{bytes_received}
+            += $$message{statistics}{$query}{session}{bytes_received};
+    }
+
+   # As we cannot ensure message ordering when using datagrams, we must output
+   # results with a bit of delay so we can ensure we got most of the messages
+   # for that minute. I'm choosing to output messages for the minute (N-2)%60
+   # every minute.
 
     # FIXME: try doing something a little more useful than this with the data.
     $Data::Dumper::Terse  = 1;
@@ -289,7 +309,13 @@ sub tear_down_ipc { }
 
 =cut
 
-sub output_results { print "\n\nComplete!\n\n" }
+sub output_results {
+    my ($self) = @_;
+    $Data::Dumper::Terse  = 1;
+    $Data::Dumper::Indent = 0;
+    print Data::Dumper::Dumper( $$self{global_stats} ), $/;
+    print "\n\nComplete!\n\n";
+}
 
 =head1 AUTHOR
 

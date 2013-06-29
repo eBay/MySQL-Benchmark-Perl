@@ -263,10 +263,16 @@ BENCHMARK_LOOP:
             my $time_end   = [Time::HiRes::gettimeofday];
             my $end_stat   = $self->session_status;
 
-            $$self{partial}{ $query->id }{runs}++;
-            $$self{partial}{ $query->id }{run_time}
-                += Time::HiRes::tv_interval( $time_start, $time_end );
-            if ( defined($ini_stat) && defined($end_stat) ) {
+           # Only account for rounds where you have all measurements.
+           # Also, don't account for rounds where the bytes sent are negative.
+            if (   defined($ini_stat)
+                && defined($end_stat)
+                && $$end_stat{bytes_sent} >= $$ini_stat{bytes_sent}
+                && $$end_stat{bytes_received} >= $$ini_stat{bytes_received} )
+            {
+                $$self{partial}{ $query->id }{runs}++;
+                $$self{partial}{ $query->id }{run_time}
+                    += Time::HiRes::tv_interval( $time_start, $time_end );
                 foreach my $key (qw( bytes_sent bytes_received )) {
                     $$self{partial}{ $query->id }{session}{$key}
                         += $$end_stat{$key} - $$ini_stat{$key};

@@ -1,0 +1,4 @@
+^.*\.swp$
+\.git\/
+^\.gitignore$
+^MANIFEST\.SKIP$

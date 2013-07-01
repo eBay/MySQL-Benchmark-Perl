@@ -47,7 +47,7 @@ sub new {
 
     $self->evaluate_command_line_options;
     $self->load_queries_file;
-    $self->initialize_ipc;
+    $self->initialise_ipc;
     $self->fork_workers;
     $self->initialise_signal_handlers;
     $self->supervision_loop;
@@ -106,7 +106,7 @@ sub load_queries_file {
 
 =cut 
 
-sub initialize_ipc {
+sub initialise_ipc {
     my ($self) = @_;
     my $server = eval { MySQL::Benchmark::IPC::Server->new };
     die qq{Cannot initalise IPC communications: $@} if $@;
@@ -204,7 +204,7 @@ sub handle_sigterm {
     $self->stop_benchmark;
 }
 
-=head2 initialise_signal_handers
+=head2 initialise_signal_handlers
 
 =cut
 

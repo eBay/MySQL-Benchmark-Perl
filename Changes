@@ -1,5 +1,5 @@
 Revision history for mysql-benchmark
 
-0.01    Date/time
-        First version, released on an unsuspecting world.
+1.00   Tue 2 Jul 2013 15:53:26 +0200
+        Initial release of MySQL::Benchmark
 

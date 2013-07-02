@@ -25,7 +25,7 @@ Version 1.00
 
 =cut
 
-our $VERSION = '1.01';
+our $VERSION = '1.02';
 
 =head1 SYNOPSIS
 
@@ -328,7 +328,8 @@ sub output_results {
 
     print qq{\n\n\n\nBenchmark Complete.}, qq{\n\n\tStart Time: $start_time},
         qq{\n\tEnd Time: $end_time},
-        qq{\n\tReal Clock Run Time: $real_clock_run_time seconds.\n};
+        qq{\n\tReal Clock Run Time: $real_clock_run_time seconds.},
+        qq{\n\tUsed $$self{options}{workers} worker processes.\n};
 
     print qq{\n\tPER QUERY STATISTICS:};
     foreach my $query ( keys %{ $$self{global_stats}{per_query} } ) {
@@ -336,8 +337,8 @@ sub output_results {
             qq{\n\t\t\tRun Time: $$self{global_stats}{per_query}{$query}{run_time}},
             qq{\n\t\t\tRuns: $$self{global_stats}{per_query}{$query}{runs}},
             qq{\n\t\t\tBytes Sent: $$self{global_stats}{per_query}{$query}{bytes_sent}},
-            qq{\n\t\t\tBytes Received: $$self{global_stats}{per_query}{$query}{bytes_received}}
-            ,;
+            qq{\n\t\t\tBytes Received: $$self{global_stats}{per_query}{$query}{bytes_received}},
+            qq{\n};
     }
     print qq{\n\n\tGLOBAL STATISTICS:},
         qq{\n\t\tRun Time: $$self{global_stats}{totals}{run_time}},

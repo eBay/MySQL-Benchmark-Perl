@@ -10,7 +10,7 @@ use MySQL::Benchmark::Worker;
 use MySQL::Benchmark::Query;
 use MySQL::Benchmark::Logger qw(log);
 use Time::HiRes;
-use POSIX qw(:sys_wait_h );
+use POSIX qw(:sys_wait_h strftime);
 use YAML::XS ();
 use Storable ();
 use Data::Dumper();
@@ -25,7 +25,7 @@ Version 1.00
 
 =cut
 
-our $VERSION = '1.00';
+our $VERSION = '1.01';
 
 =head1 SYNOPSIS
 
@@ -255,25 +255,28 @@ sub process_message {
 
     # The idea here is to maintain global totals and per-minute partials.
     foreach my $query ( keys %{ $$message{statistics} } ) {
-        $$self{global_stats}{$query}{runs}
+
+        # Global Total
+        $$self{global_stats}{totals}{runs}
             += $$message{statistics}{$query}{runs};
-        $$self{global_stats}{$query}{runtime}
+        $$self{global_stats}{totals}{run_time}
             += $$message{statistics}{$query}{run_time};
-        $$self{global_stats}{$query}{bytes_sent}
+        $$self{global_stats}{totals}{bytes_sent}
             += $$message{statistics}{$query}{session}{bytes_sent};
-        $$self{global_stats}{$query}{bytes_received}
+        $$self{global_stats}{totals}{bytes_received}
+            += $$message{statistics}{$query}{session}{bytes_received};
+
+        # Per Query Totals
+        $$self{global_stats}{per_query}{$query}{runs}
+            += $$message{statistics}{$query}{runs};
+        $$self{global_stats}{per_query}{$query}{run_time}
+            += $$message{statistics}{$query}{run_time};
+        $$self{global_stats}{per_query}{$query}{bytes_sent}
+            += $$message{statistics}{$query}{session}{bytes_sent};
+        $$self{global_stats}{per_query}{$query}{bytes_received}
             += $$message{statistics}{$query}{session}{bytes_received};
     }
 
-   # As we cannot ensure message ordering when using datagrams, we must output
-   # results with a bit of delay so we can ensure we got most of the messages
-   # for that minute. I'm choosing to output messages for the minute (N-2)%60
-   # every minute.
-
-    # FIXME: try doing something a little more useful than this with the data.
-    $Data::Dumper::Terse  = 1;
-    $Data::Dumper::Indent = 0;
-    print Data::Dumper::Dumper($message), $/;
 }
 
 =head2 supervision_loop
@@ -297,6 +300,8 @@ SUPERVISION_LOOP:
         }
     }
 
+    $$self{end_time} = [Time::HiRes::gettimeofday];
+
 }
 
 =head2 tear_down_ipc
@@ -310,16 +315,43 @@ sub tear_down_ipc { }
 =cut
 
 sub output_results {
-    my ($self) = @_;
-    $Data::Dumper::Terse  = 1;
-    $Data::Dumper::Indent = 0;
-    print Data::Dumper::Dumper( $$self{global_stats} ), $/;
-    print "\n\nComplete!\n\n";
+    my ($self)     = @_;
+    my @start_time = @{ $$self{start_time} };
+    my @end_time   = @{ $$self{end_time} };
+    my $start_time
+        = strftime( '%Y-%m-%d %H:%M:%S.', localtime( $start_time[0] ) )
+        . $start_time[1];
+    my $end_time = strftime( '%Y-%m-%d %H:%M:%S.', localtime( $end_time[0] ) )
+        . $end_time[1];
+
+    my $real_clock_run_time = Time::HiRes::tv_interval( $$self{start_time} );
+
+    print qq{\n\n\n\nBenchmark Complete.}, qq{\n\n\tStart Time: $start_time},
+        qq{\n\tEnd Time: $end_time},
+        qq{\n\tReal Clock Run Time: $real_clock_run_time seconds.\n};
+
+    print qq{\n\tPER QUERY STATISTICS:};
+    foreach my $query ( keys %{ $$self{global_stats}{per_query} } ) {
+        print qq{\n\t\tQuery ID: $query},
+            qq{\n\t\t\tRun Time: $$self{global_stats}{per_query}{$query}{run_time}},
+            qq{\n\t\t\tRuns: $$self{global_stats}{per_query}{$query}{runs}},
+            qq{\n\t\t\tBytes Sent: $$self{global_stats}{per_query}{$query}{bytes_sent}},
+            qq{\n\t\t\tBytes Received: $$self{global_stats}{per_query}{$query}{bytes_received}}
+            ,;
+    }
+    print qq{\n\n\tGLOBAL STATISTICS:},
+        qq{\n\t\tRun Time: $$self{global_stats}{totals}{run_time}},
+        qq{\n\t\tRuns: $$self{global_stats}{totals}{runs}},
+        qq{\n\t\tBytes Sent: $$self{global_stats}{totals}{bytes_sent}},
+        qq{\n\t\tBytes Received: $$self{global_stats}{totals}{bytes_received}},
+        qq{\n} x 3;
+
+    # Time::HiRes::tv_interval( $$self{start_time} )
 }
 
 =head1 AUTHOR
 
-Luis Motta Campos, C<< <lmc at cpan.org> >>
+Luis Motta Campos, C << <lmc at cpan.org> >>
 
 =head1 BUGS
 

@@ -191,7 +191,7 @@ RUN_QUERY: {
             redo RUN_QUERY;
         }
     }
-    die if $@;
+    $self->log( qq{Benchmark Query Error: $@.} ) if $@;
     return $result;
 }
 

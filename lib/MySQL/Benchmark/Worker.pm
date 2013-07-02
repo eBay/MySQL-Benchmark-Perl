@@ -253,6 +253,10 @@ RUN_QUERY: {
 
 sub benchmark_loop {
     my ($self) = @_;
+
+    # TODO: make the actual flushing time be a function of the flush-interval
+    # and the number of workers, so we distribute the flushing load uniformly
+    # over time.
     my $last_flush = [Time::HiRes::gettimeofday];
 
 BENCHMARK_LOOP:

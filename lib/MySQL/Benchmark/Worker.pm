@@ -123,6 +123,10 @@ sub __dsn {
     my ($self) = @_;
     my $dsn = 'DBI:mysql:'
         . (
+        defined $$self{mysql}{host} ? ';host=' . $$self{mysql}{host}
+        : ''
+        )
+        . (
         defined $$self{mysql}{schema} ? ';database=' . $$self{mysql}{schema}
         : ''
         )
@@ -191,7 +195,7 @@ RUN_QUERY: {
             redo RUN_QUERY;
         }
     }
-    $self->log( qq{Benchmark Query Error: $@.} ) if $@;
+    $self->log(qq{Benchmark Query Error: $@.}) if $@;
     return $result;
 }
 

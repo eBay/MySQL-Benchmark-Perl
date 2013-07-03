@@ -13,6 +13,7 @@ use Time::HiRes;
 use POSIX qw(:sys_wait_h strftime);
 use YAML::XS ();
 use Storable ();
+use List::Util();
 use Data::Dumper();
 
 =head1 NAME
@@ -137,7 +138,7 @@ sub fork_workers {
         push @{ $$self{worker_pids} },
             MySQL::Benchmark::Worker->new(
             mysql          => $$self{options}{mysql},
-            queries        => $$self{queries},
+            queries        => [ List::Util::shuffle( @{ $$self{queries} } ) ],
             flush_interval => $$self{options}{flush_interval},
             socket_file    => $self->ipc_server_socket,
             );

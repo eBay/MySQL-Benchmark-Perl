@@ -180,7 +180,7 @@ sub new {
         },
         list => sub {
             my $arguments = shift;
-            my ($values) = $$arguments{values};
+            my $values    = $$arguments{values};
             return sub { return @$values };
         },
         random_integer => sub {

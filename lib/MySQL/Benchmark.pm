@@ -10,7 +10,7 @@ use MySQL::Benchmark::Worker;
 use MySQL::Benchmark::Query;
 use MySQL::Benchmark::Logger qw(log);
 use Time::HiRes;
-use POSIX qw(:sys_wait_h strftime);
+use POSIX qw(:sys_wait_h strftime ceil);
 use YAML::XS ();
 use Storable ();
 use List::Util();
@@ -48,6 +48,7 @@ sub new {
 
     $self->evaluate_command_line_options;
     $self->load_queries_file;
+    $self->normalise_query_weights;
     $self->initialise_ipc;
     $self->fork_workers;
     $self->initialise_signal_handlers;
@@ -66,24 +67,26 @@ sub evaluate_command_line_options {
     # Default configuration
     # FIXME: define workers in function of available processor cores?
     my $options = {
-        workers        => 1,
-        runtime        => 10,
-        mysql          => { defaults_file => "$ENV{HOME}/.my.cnf" },
-        flush_interval => 3,
+        workers              => 1,
+        runtime              => 10,
+        mysql                => { defaults_file => "$ENV{HOME}/.my.cnf" },
+        flush_interval       => 3,
+        max_query_array_size => 100,
     };
 
     my $result = GetOptions(
-        'debug'            => \$$options{debug},
-        'verbose'          => \$$options{verbose},
-        'queries=s'        => \$$options{queries},
-        'workers=i'        => \$$options{workers},
-        'dbhost=s'         => \$$options{mysql}{host},
-        'dbschema=s'       => \$$options{mysql}{schema},
-        'dbuser=s'         => \$$options{mysql}{user},
-        'dbpassword=s'     => \$$options{mysql}{password},
-        'dbdefaults=s'     => \$$options{mysql}{defaults_file},
-        'runtime=i'        => \$$options{runtime},
-        'flush_interval=i' => \$$options{flush_interval},
+        'debug'                  => \$$options{debug},
+        'verbose'                => \$$options{verbose},
+        'queries=s'              => \$$options{queries},
+        'workers=i'              => \$$options{workers},
+        'dbhost=s'               => \$$options{mysql}{host},
+        'dbschema=s'             => \$$options{mysql}{schema},
+        'dbuser=s'               => \$$options{mysql}{user},
+        'dbpassword=s'           => \$$options{mysql}{password},
+        'dbdefaults=s'           => \$$options{mysql}{defaults_file},
+        'max-query-array-size=i' => \\$$options{max_query_array_size},
+        'runtime=i'              => \$$options{runtime},
+        'flush-interval=i'       => \$$options{flush_interval},
     );
 
     $$self{options} = $options;
@@ -101,6 +104,44 @@ sub load_queries_file {
 
     $$self{queries} = [ map { MySQL::Benchmark::Query->new($_) }
             @{ YAML::XS::LoadFile( $$self{options}{queries} ) } ];
+}
+
+=head2 normalise_query_weights
+
+Assigns proper weights for every query loaded from the Query Descriptor File.
+
+=cut
+
+sub normalise_query_weights {
+    my ($self) = @_;
+
+    # Calculate Total Weight from the Query Definition File
+    my $total_weight = 0;
+    foreach my $query ( @{ $$self{queries} } ) {
+        $total_weight += $query->weight;
+    }
+    $self->log("Total Query Weight is $total_weight.");
+
+    # Normalise the weight of all queries to the requested array size
+    my @new_queries = ();
+    foreach my $query ( @{ $$self{queries} } ) {
+        my $new_weight
+            = ceil( $$self{options}{max_query_array_size}
+                * $query->weight
+                / $total_weight );
+        $new_weight = $new_weight > 1 ? $new_weight : 1;
+        $query->weight($new_weight);
+        $self->log(
+            qq(Query @{[$query->id]} has normalised weight of @{[$query->weight]}.)
+        );
+
+        # Reflect the change on the new Query Array.
+        push @new_queries, $query for 1 .. $new_weight;
+    }
+
+    $$self{queries} = [ @new_queries ];
+
+    return;
 }
 
 =head2 initialise_ipc

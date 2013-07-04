@@ -72,21 +72,25 @@ sub evaluate_command_line_options {
         mysql                => { defaults_file => "$ENV{HOME}/.my.cnf" },
         flush_interval       => 3,
         max_query_array_size => 100,
+        report               => 0,
     };
 
     my $result = GetOptions(
-        'debug'                  => \$$options{debug},
-        'verbose'                => \$$options{verbose},
+        'debug'   => \$$options{debug},
+        'verbose' => \$$options{verbose},
+        'report'  => \$$options{report},
+
         'queries=s'              => \$$options{queries},
         'workers=i'              => \$$options{workers},
-        'dbhost=s'               => \$$options{mysql}{host},
-        'dbschema=s'             => \$$options{mysql}{schema},
-        'dbuser=s'               => \$$options{mysql}{user},
-        'dbpassword=s'           => \$$options{mysql}{password},
-        'dbdefaults=s'           => \$$options{mysql}{defaults_file},
-        'max-query-array-size=i' => \\$$options{max_query_array_size},
+        'max-query-array-size=i' => \$$options{max_query_array_size},
         'runtime=i'              => \$$options{runtime},
         'flush-interval=i'       => \$$options{flush_interval},
+
+        'dbhost=s'     => \$$options{mysql}{host},
+        'dbschema=s'   => \$$options{mysql}{schema},
+        'dbuser=s'     => \$$options{mysql}{user},
+        'dbpassword=s' => \$$options{mysql}{password},
+        'dbdefaults=s' => \$$options{mysql}{defaults_file},
     );
 
     $$self{options} = $options;
@@ -139,7 +143,7 @@ sub normalise_query_weights {
         push @new_queries, $query for 1 .. $new_weight;
     }
 
-    $$self{queries} = [ @new_queries ];
+    $$self{queries} = [@new_queries];
 
     return;
 }
@@ -352,11 +356,11 @@ SUPERVISION_LOOP:
 
 sub tear_down_ipc { }
 
-=head2 output_results
+=head2 __format_times
 
 =cut
 
-sub output_results {
+sub __format_times {
     my ($self)     = @_;
     my @start_time = @{ $$self{start_time} };
     my @end_time   = @{ $$self{end_time} };
@@ -368,28 +372,56 @@ sub output_results {
 
     my $real_clock_run_time = Time::HiRes::tv_interval( $$self{start_time} );
 
-    print qq{\n\n\n\nBenchmark Complete.}, qq{\n\n\tStart Time: $start_time},
-        qq{\n\tEnd Time: $end_time},
-        qq{\n\tReal Clock Run Time: $real_clock_run_time seconds.},
-        qq{\n\tUsed $$self{options}{workers} worker processes.\n};
+    my $$self{formatted}{qw(start end real)}
+        = ( $start_time, $end_time, $real_clock_run_time );
+    return;
+}
 
-    print qq{\n\tPER QUERY STATISTICS:};
-    foreach my $query ( keys %{ $$self{global_stats}{per_query} } ) {
-        print qq{\n\t\tQuery ID: $query},
-            qq{\n\t\t\tRun Time: $$self{global_stats}{per_query}{$query}{run_time}},
-            qq{\n\t\t\tRuns: $$self{global_stats}{per_query}{$query}{runs}},
-            qq{\n\t\t\tBytes Sent: $$self{global_stats}{per_query}{$query}{bytes_sent}},
-            qq{\n\t\t\tBytes Received: $$self{global_stats}{per_query}{$query}{bytes_received}},
-            qq{\n};
+=head2 output_results
+
+=cut
+
+sub output_results {
+    my ($self) = @_;
+
+    $self->__format_times;
+
+    if ( $$self{options}{report} ) {
+        print $self->human_readable_results;
     }
-    print qq{\n\n\tGLOBAL STATISTICS:},
-        qq{\n\t\tRun Time: $$self{global_stats}{totals}{run_time}},
-        qq{\n\t\tRuns: $$self{global_stats}{totals}{runs}},
-        qq{\n\t\tBytes Sent: $$self{global_stats}{totals}{bytes_sent}},
-        qq{\n\t\tBytes Received: $$self{global_stats}{totals}{bytes_received}},
-        qq{\n} x 3;
+}
 
-    # Time::HiRes::tv_interval( $$self{start_time} )
+=head2 human_readable_results
+
+=cut
+
+sub human_readable_results {
+    my ($self) = @_;
+
+    my $result = qq{\n\n\n\nBenchmark Complete.},
+          qq(\n\n\tStart Time: $$self{formatted}{start})
+        . qq(\n\tEnd Time: $$self{formatted}{end})
+        . qq(\n\tReal Clock Run Time: $$self{formatted}{real} seconds.)
+        . qq(\n\tUsed $$self{options}{workers} worker processes.\n)
+        . qq(\n\tPER QUERY STATISTICS:)
+        . join(
+        "\n",
+        map {
+                  qq(\n\t\tQuery ID: $_)
+                . qq(\n\t\t\tRun Time: $$self{global_stats}{per_query}{$_}{run_time})
+                . qq(\n\t\t\tRuns: $$self{global_stats}{per_query}{$_}{runs})
+                . qq(\n\t\t\tBytes Sent: $$self{global_stats}{per_query}{$_}{bytes_sent})
+                . qq(\n\t\t\tBytes Received: $$self{global_stats}{per_query}{$_}{bytes_received})
+        },
+        keys %{ $$self{global_stats}{per_query} }
+        )
+        . qq(\n\n\tGLOBAL STATISTICS:)
+        . qq(\n\t\tRun Time: $$self{global_stats}{totals}{run_time})
+        . qq(\n\t\tRuns: $$self{global_stats}{totals}{runs})
+        . qq(\n\t\tBytes Sent: $$self{global_stats}{totals}{bytes_sent})
+        . qq(\n\t\tBytes Received: $$self{global_stats}{totals}{bytes_received})
+        . qq{\n} x 3;
+    return;
 }
 
 =head1 AUTHOR

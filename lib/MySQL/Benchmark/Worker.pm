@@ -32,9 +32,16 @@ MySQL::Benchmark::Worker - a process abstraction for MySQL::Benchmark.
 
 This object abstracts a worker process away.
 
-The process approach is a sound strategy for benchmarking MySQL. Benchmark usually involves placing a lot of requests to a server and lots of waiting time, so a single control process can easily manage dozens of worker processes (which will most of the time be waiting for I/O either to or from the database server).
+The process approach is a sound strategy for benchmarking MySQL. Benchmark
+usually involves placing a lot of requests to a server and lots of waiting
+time, so a single control process can easily manage dozens of worker processes
+(which will most of the time be waiting for I/O either to or from the database
+server).
 
-Apart from running queries against the database server, this process is also responsible for parameter generation (with the help of L<MySQL::Benchmark::Query>) and for accounting and sending query statistics back to the L<Controller Process|MySQL::Benchmark>.
+Apart from running queries against the database server, this process is also
+responsible for parameter generation (with the help of
+L<MySQL::Benchmark::Query>) and for accounting and sending query statistics
+back to the L<Controller Process|MySQL::Benchmark>.
 
 =head1 METHODS 
 
@@ -42,7 +49,8 @@ Apart from running queries against the database server, this process is also res
 
 Constructor. Returns the process ID of the newly created worker.
 
-Won't fork if the environment variable C<MYSQL_BENCHMARK_FORKLESS_WORKER> contains a true value (in the perl sense of true).
+Won't fork if the environment variable C<MYSQL_BENCHMARK_FORKLESS_WORKER>
+contains a true value (in the perl sense of true).
 
 =cut
 

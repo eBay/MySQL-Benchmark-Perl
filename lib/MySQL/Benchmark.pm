@@ -79,6 +79,7 @@ sub evaluate_command_line_options {
         'debug'     => \$$options{debug},
         'verbose'   => \$$options{verbose},
         'report'    => \$$options{report},
+        'csv'       => \$$options{csv},
         'outfile=s' => \$$options{outfile},
 
         'queries=s'              => \$$options{queries},
@@ -373,7 +374,7 @@ sub __format_times {
 
     my $real_clock_run_time = Time::HiRes::tv_interval( $$self{start_time} );
 
-    my $$self{formatted}{qw(start end real)}
+    @{ $$self{formatted} }{qw(start end real)}
         = ( $start_time, $end_time, $real_clock_run_time );
     return;
 }
@@ -397,10 +398,56 @@ sub output_results {
     if ( $$self{options}{report} ) {
         print $outfile $self->output_report;
     }
+
+    if ( $$self{options}{csv} ) {
+        print $outfile $self->output_csv;
     }
 
     if ( $$self{options}{outfile} ) { close $$self{outfile} or die $!; }
 }
+
+=head2 output_csv
+
+=cut
+
+sub output_csv {
+    my ($self) = @_;
+    my $result = join( ',',
+        'Start Time',
+        'End Time',
+        'Real Elapsed Time',
+        'Workers',
+        'Run Time',
+        'Runs',
+        'Bytes Sent',
+        'Bytes Received' )
+        . "\n";
+    $result .= join( ',',
+        "'$$self{formatted}{start}'",
+        "'$$self{formatted}{end}'",
+        $$self{formatted}{real},
+        $$self{options}{workers},
+        @{ $$self{global_stats}{totals} }
+            {qw( run_time runs bytes_sent bytes_received )} )
+        . "\n";
+    $result .= "\n";
+    $result .= join(
+        "\n",
+        join( ',',
+            'Query ID',
+            'Run Time',
+            'Runs',
+            'Bytes Sent',
+            'Bytes Received' ),
+        map {
+            join( ',',
+                "'$_'",
+                @{ $$self{global_stats}{per_query}{$_} }
+                    {qw( run_time runs bytes_sent bytes_received )} )
+            }
+            keys %{ $$self{global_stats}{per_query} }
+    ) . "\n";
+    return $result;
 }
 
 =head2 output_report
@@ -410,8 +457,9 @@ sub output_results {
 sub output_report {
     my ($self) = @_;
 
-    my $result = qq(\nBenchmark Complete.).
-          qq(\n\n\tStart Time: $$self{formatted}{start})
+    my $result
+        = qq(\nBenchmark Complete.)
+        . qq(\n\n\tStart Time: $$self{formatted}{start})
         . qq(\n\tEnd Time: $$self{formatted}{end})
         . qq(\n\tReal Clock Elapsed Time: $$self{formatted}{real} seconds.)
         . qq(\n\tUsed $$self{options}{workers} worker processes.\n)

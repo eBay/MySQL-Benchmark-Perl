@@ -71,7 +71,7 @@ sub evaluate_command_line_options {
         runtime              => 10,
         mysql                => { defaults_file => "$ENV{HOME}/.my.cnf" },
         flush_interval       => 3,
-        max_query_array_size => 100,
+        max_query_array_size => 10,
         report               => 0,
     };
 

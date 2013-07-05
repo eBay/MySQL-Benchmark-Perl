@@ -77,6 +77,7 @@ sub evaluate_command_line_options {
 
     my $result = GetOptions(
         'debug'     => \$$options{debug},
+        'quiet'     => \$$options{quiet},
         'verbose'   => \$$options{verbose},
         'report'    => \$$options{report},
         'csv'       => \$$options{csv},
@@ -204,7 +205,8 @@ sub fork_workers {
             socket_file    => $self->ipc_server_socket,
             options        => {
                 debug   => $$self{options}{debug},
-                verbose => $$self{options}{verbose}
+                verbose => $$self{options}{verbose},
+                quiet   => $$self{options}{quiet},
             },
             );
     }

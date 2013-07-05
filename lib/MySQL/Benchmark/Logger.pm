@@ -32,6 +32,7 @@ willing to implement C<log()>.
 
 sub log {
     my ( $self, @messages ) = @_;
+    return if $$self{options}{quiet};
 
     my $debug_info = '';
     if ( $$self{options}{debug} ) {

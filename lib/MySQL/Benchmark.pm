@@ -75,7 +75,14 @@ sub evaluate_command_line_options {
         report               => 0,
     };
 
+    my $version_handler = sub {
+            use FindBin qw($Bin);
+        print STDERR qq{$Bin running version $MySQL::Benchmark::VERSION.\n};
+        exit;
+    };
+
     my $result = GetOptions(
+        'version'   => $version_handler,
         'debug'     => \$$options{debug},
         'quiet'     => \$$options{quiet},
         'verbose'   => \$$options{verbose},

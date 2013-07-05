@@ -410,7 +410,7 @@ sub output_results {
 sub output_report {
     my ($self) = @_;
 
-    my $result = qq{\nBenchmark Complete.},
+    my $result = qq(\nBenchmark Complete.).
           qq(\n\n\tStart Time: $$self{formatted}{start})
         . qq(\n\tEnd Time: $$self{formatted}{end})
         . qq(\n\tReal Clock Elapsed Time: $$self{formatted}{real} seconds.)

@@ -76,9 +76,9 @@ sub evaluate_command_line_options {
     };
 
     my $result = GetOptions(
-        'debug'   => \$$options{debug},
-        'verbose' => \$$options{verbose},
-        'report'  => \$$options{report},
+        'debug'     => \$$options{debug},
+        'verbose'   => \$$options{verbose},
+        'report'    => \$$options{report},
 
         'queries=s'              => \$$options{queries},
         'workers=i'              => \$$options{workers},
@@ -387,15 +387,16 @@ sub output_results {
     $self->__format_times;
 
     if ( $$self{options}{report} ) {
-        print $self->human_readable_results;
+        print $outfile $self->output_report;
+    }
     }
 }
 
-=head2 human_readable_results
+=head2 output_report
 
 =cut
 
-sub human_readable_results {
+sub output_report {
     my ($self) = @_;
 
     my $result = qq{\n\n\n\nBenchmark Complete.},

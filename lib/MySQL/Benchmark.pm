@@ -79,6 +79,7 @@ sub evaluate_command_line_options {
         'debug'     => \$$options{debug},
         'verbose'   => \$$options{verbose},
         'report'    => \$$options{report},
+        'outfile=s' => \$$options{outfile},
 
         'queries=s'              => \$$options{queries},
         'workers=i'              => \$$options{workers},
@@ -386,10 +387,20 @@ sub output_results {
 
     $self->__format_times;
 
+    # Either open the right file or redirect the output
+    my $outfile;
+    if ( $$self{options}{outfile} ) {
+        open $outfile, '>', $$self{options}{outfile} or die $!;
+    }
+    else { $outfile = \*STDOUT; }
+
     if ( $$self{options}{report} ) {
         print $outfile $self->output_report;
     }
     }
+
+    if ( $$self{options}{outfile} ) { close $$self{outfile} or die $!; }
+}
 }
 
 =head2 output_report

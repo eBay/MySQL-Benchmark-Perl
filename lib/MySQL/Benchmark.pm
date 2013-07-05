@@ -105,11 +105,21 @@ sub evaluate_command_line_options {
 sub load_queries_file {
     my ($self) = @_;
 
-    die qq(File "$$self{options}{queries}" doesn't exist.)
-        unless -f $$self{options}{queries};
+    unless ( -f $$self{options}{queries} ) {
+        $self->log(qq(File "$$self{options}{queries}" doesn't exist.));
+        exit;
+    }
 
     $$self{queries} = [ map { MySQL::Benchmark::Query->new($_) }
             @{ YAML::XS::LoadFile( $$self{options}{queries} ) } ];
+
+    if ( $$self{options}{debug} ) {
+        $self->log( q(Loaded )
+                . ( $$self{queries} ? scalar @{ $$self{queries} } : 0 )
+                . qq( queries from file "$$self{options}{queries}".) );
+    }
+
+    return;
 }
 
 =head2 normalise_query_weights
@@ -126,7 +136,8 @@ sub normalise_query_weights {
     foreach my $query ( @{ $$self{queries} } ) {
         $total_weight += $query->weight;
     }
-    $self->log("Total Query Weight is $total_weight.");
+    $self->log("Total Query Weight is $total_weight.")
+        if $$self{options}{debug};
 
     # Normalise the weight of all queries to the requested array size
     my @new_queries = ();
@@ -139,7 +150,7 @@ sub normalise_query_weights {
         $query->weight($new_weight);
         $self->log(
             qq(Query @{[$query->id]} has normalised weight of @{[$query->weight]}.)
-        );
+        ) if $$self{options}{debug};
 
         # Reflect the change on the new Query Array.
         push @new_queries, $query for 1 .. $new_weight;
@@ -157,7 +168,10 @@ sub normalise_query_weights {
 sub initialise_ipc {
     my ($self) = @_;
     my $server = eval { MySQL::Benchmark::IPC::Server->new };
-    die qq{Cannot initalise IPC communications: $@} if $@;
+    if ($@) {
+        $self->log(qq{Cannot initalise IPC communications: $@});
+        exit;
+    }
     $$self{ipc_server} = $server;
 }
 
@@ -188,9 +202,14 @@ sub fork_workers {
             queries        => [ List::Util::shuffle( @{ $$self{queries} } ) ],
             flush_interval => $$self{options}{flush_interval},
             socket_file    => $self->ipc_server_socket,
+            options        => {
+                debug   => $$self{options}{debug},
+                verbose => $$self{options}{verbose}
+            },
             );
     }
-    $self->log("Forked workers: @{ $$self{worker_pids} }.");
+    $self->log("Forked workers: @{ $$self{worker_pids} }.")
+        if $$self{options}{debug};
 }
 
 =head2 tear_down_workers
@@ -200,7 +219,7 @@ sub fork_workers {
 sub tear_down_workers {
     my ($self) = @_;
     my $stopped_count;
-    {
+    if ( $$self{options}{debug} ) {
         local $" = ', ';
         $self->log("Signalling workers: @{ $$self{worker_pids} }.");
     }
@@ -209,7 +228,7 @@ sub tear_down_workers {
             $stopped_count += $count;
         }
     }
-    $self->log("Signalled $stopped_count workers.");
+    $self->log("Signalled $stopped_count workers.") if $$self{options}{debug};
 }
 
 =head2 stop_benchmark
@@ -219,7 +238,7 @@ sub tear_down_workers {
 sub stop_benchmark {
     my ($self) = @_;
     return if $self->is_stopped;
-    $self->log('Stopping benchmark');
+    $self->log('Stopping benchmark') if $$self{options}{debug};
     $$self{STOP} = 1;
     $self->tear_down_workers;
 }

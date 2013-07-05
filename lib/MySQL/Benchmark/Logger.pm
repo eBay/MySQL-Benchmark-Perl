@@ -32,20 +32,28 @@ willing to implement C<log()>.
 
 sub log {
     my ( $self, @messages ) = @_;
-    my ( $package, $filename, $line, $subroutine ) = caller 1;
-    $package = ( split qr{::}, $package )[-1];
+
+    my $debug_info = '';
+    if ( $$self{options}{debug} ) {
+        my ( $package, $filename, $line, $subroutine ) = caller 1;
+        $package = ( split qr{::}, $package )[-1];
+        $debug_info
+            = $package . '['
+            . $$ . ']: ' . '('
+            . $subroutine . ':'
+            . $line . ') ';
+    }
+
     my ( $s, $ms ) = Time::HiRes::gettimeofday;
     my ( $sec, $min, $hour, $mday, $mon, $year ) = localtime($s);
     $year += 1900;
     print STDERR map {
         sprintf( '%04d-%02d-%02d %02d:%02d:%02d.%06.0f ',
             $year, $mon, $mday, $hour, $min, $sec, $ms )
-            . $package . '['
-            . $$ . ']: ' . '('
-            . $subroutine . ':'
-            . $line . ') '
-            . $_ . "\n"
+            . $debug_info . $_ . "\n"
     } @messages;
+
+    return;
 }
 
 =head1 AUTHOR

@@ -101,7 +101,10 @@ sub initialise_ipc {
         MySQL::Benchmark::IPC::Client->new(
             socket_file => $$self{socket_file} );
     };
-    die if $@;
+    if ($@) {
+        $self->log(qq{Cannot Initialise IPC Client: "$!".});
+        exit;
+    }
     $$self{ipc_client} = $client;
 }
 
@@ -143,6 +146,9 @@ sub __dsn {
         ? ';mysql_read_default_file=' . $$self{mysql}{defaults_file}
         : ''
         );
+
+    $self->log(qq{DSN: "$dsn".}) if $$self{options}{debug};
+
     return $dsn;
 }
 
@@ -158,7 +164,10 @@ sub initialise_database_connection {
         $$self{mysql}{user},
         $$self{mysql}{password}, DBOPTIONS
     );
-    die DBI::errstr unless $$self{dbh};
+    unless ( $$self{dbh} ) {
+        $self->log(qq{DBI::connect: "$DBI::errstr".});
+        exit;
+    }
 }
 
 =head2 dbh
@@ -251,7 +260,11 @@ RUN_QUERY: {
             redo RUN_QUERY;
         }
     }
-    die if $@;
+    if( $@ ) {
+            $self->log( qq{Session Information Data Collection Failed: "$@".} );
+            $self->stop;
+    }
+
     return $result;
 }
 

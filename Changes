@@ -14,3 +14,7 @@ Revision history for mysql-benchmark
         Added CSV file creation features.
         Added report-to-file feature.
         Improved logging, debugging features.
+
+1.04   Fri 5 Jul 2013 17:10:00 +0200
+        Bug fix - was using the wrong variable when closing outfile.
+		Added a "quiet" logging option.

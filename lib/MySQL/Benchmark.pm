@@ -422,7 +422,7 @@ sub output_results {
         print $outfile $self->output_csv;
     }
 
-    if ( $$self{options}{outfile} ) { close $$self{outfile} or die $!; }
+    if ( $$self{options}{outfile} ) { close $outfile or die $!; }
 }
 
 =head2 output_csv

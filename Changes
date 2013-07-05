@@ -5,3 +5,12 @@ Revision history for mysql-benchmark
 
 1.01   Tue 2 Jul 2013 18:30:00 +0200
         Implemented a better output method for MySQL::Benchmark.
+
+1.02   Thu 4 Jul 2013 16:30:00 +0200
+        Improved query distribution (better approximation to the Normal Curve).
+        Added Query Weight feature to better mimic a given workload.
+
+1.03   Fri 5 Jul 2013 16:30:00 +0200
+        Added CSV file creation features.
+        Added report-to-file feature.
+        Improved logging, debugging features.

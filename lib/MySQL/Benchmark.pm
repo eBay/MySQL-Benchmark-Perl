@@ -399,10 +399,10 @@ sub output_results {
 sub output_report {
     my ($self) = @_;
 
-    my $result = qq{\n\n\n\nBenchmark Complete.},
+    my $result = qq{\nBenchmark Complete.},
           qq(\n\n\tStart Time: $$self{formatted}{start})
         . qq(\n\tEnd Time: $$self{formatted}{end})
-        . qq(\n\tReal Clock Run Time: $$self{formatted}{real} seconds.)
+        . qq(\n\tReal Clock Elapsed Time: $$self{formatted}{real} seconds.)
         . qq(\n\tUsed $$self{options}{workers} worker processes.\n)
         . qq(\n\tPER QUERY STATISTICS:)
         . join(
@@ -413,16 +413,17 @@ sub output_report {
                 . qq(\n\t\t\tRuns: $$self{global_stats}{per_query}{$_}{runs})
                 . qq(\n\t\t\tBytes Sent: $$self{global_stats}{per_query}{$_}{bytes_sent})
                 . qq(\n\t\t\tBytes Received: $$self{global_stats}{per_query}{$_}{bytes_received})
-        },
-        keys %{ $$self{global_stats}{per_query} }
+            }
+            keys %{ $$self{global_stats}{per_query} }
         )
         . qq(\n\n\tGLOBAL STATISTICS:)
         . qq(\n\t\tRun Time: $$self{global_stats}{totals}{run_time})
         . qq(\n\t\tRuns: $$self{global_stats}{totals}{runs})
         . qq(\n\t\tBytes Sent: $$self{global_stats}{totals}{bytes_sent})
         . qq(\n\t\tBytes Received: $$self{global_stats}{totals}{bytes_received})
-        . qq{\n} x 3;
-    return;
+        . qq{\n\n\n};
+
+    return $result;
 }
 
 =head1 AUTHOR

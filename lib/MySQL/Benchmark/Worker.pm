@@ -343,7 +343,7 @@ sub tear_down_ipc { }
 
 =head1 AUTHOR
 
-Luis Motta Campos, C<< <lmc at bitbistro.com> >>
+Luis Motta Campos, C<< <lmc at cpan.org> >>
 
 =head1 LICENSE AND COPYRIGHT
 

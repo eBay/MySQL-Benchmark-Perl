@@ -8,11 +8,19 @@ use IO::Socket;
 
 =head1 NAME
 
-=head1 VERSION
+MySQL::Benchmark::IPC::Client - An IPC Client for MySQL::Benchmark communication
+between Controller and Workers.
 
 =head1 SYNOPSYS
 
+    use MySQL::Benchmark::IPC::Client;
+    my $ipc_client = MySQL::Benchmark::IPC::Client->new;
+    $ipc_client->send( 'some message' );
+
 =head1 DESCRIPTION
+
+This module provides a simple IPC client for message passing between the
+Controller and the Workers.
 
 =head1 METHODS
 
@@ -36,6 +44,10 @@ sub new {
 
 =head2 initialise_socket 
 
+Initialise the client-side communication socket.
+
+Called automatically by L</new()>.
+
 =cut
 
 sub initialise_socket {
@@ -51,7 +63,8 @@ sub initialise_socket {
 
 =head2 send
 
-Send a message.
+Send a message. Text only. Serialisation is a must. Watchout for the message
+size, you're limited by your system's maximum datagram packet size.
 
 =cut
 

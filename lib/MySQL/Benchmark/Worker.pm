@@ -209,7 +209,7 @@ RUN_QUERY: {
         };
         if ( defined($@) && defined($!) && $! == EINTR ) {
             $@ = $! = undef;
-            redo RUN_QUERY;
+            redo RUN_QUERY; # FIXME: reimplement as do-while for readability?
         }
     }
     $self->log(qq{Benchmark Query Error: $@.}) if $@;
@@ -230,6 +230,7 @@ sub flush_partial {
     );
 
     # Send IPC Message
+    # FIXME: add loop breaker!
     while ( !defined( $$self{ipc_client}->send($message) ) ) {
         $self->log('Message sending operation failed. Retrying.');
         sleep 1;
